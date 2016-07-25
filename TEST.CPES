@@ -1,0 +1,93 @@
+rem Déclaration des variables
+var TOTO;
+var TETE;
+
+for TOTO = 0 to 8 do
+	let TETE = 1 << TOTO;
+	print TETE;
+next;
+
+for TOTO = 1 to 10 step 2 do
+	print TOTO;
+next;
+
+rem assignation simple
+let TOTO = 0b10000;
+print TOTO;
+
+TOTO = 0x10;
+print TOTO;
+
+TOTO = 0 ~ TOTO;
+TOTO = TOTO & 0xFF;
+print TOTO;
+
+TOTO = 2016;
+print TOTO TETE;
+
+TOTO = test 0x78 TETE 90 TETE;
+
+sleep 5000;
+
+print 111111111;
+
+if TOTO < 100 then
+	TOTO = sleep 10000;
+
+	print TOTO;
+
+	exit 22;
+endif;
+
+rem opération sur une variable
+let TETE = 10 + TOTO;
+print TETE;
+
+rem branchage vers un label
+goto Olllla;
+
+rem ce code ne sera jamais exécuté
+let TETE = 10 + TOTO;
+label Zoubinette;
+print TOTO;
+print TETE;
+goto Zoubinette;
+print TETE;
+goto Olllla;
+let TOTO = TOTO + 1;
+
+label Olllla;
+let TOTO = TOTO + 10;
+print TOTO;
+let TOTO = 0;
+
+rem boucle manuelle
+label LoopTOTO;
+	if TOTO > 99 then
+		goto EndProg;
+	else
+		print TOTO;
+	endif;
+	let TOTO = TOTO + 1;
+	goto LoopTOTO;
+label EndProg;
+print TOTO;
+
+let TOTO = 0;
+let TETE = 0;
+rem boucle "tant que"
+while TOTO != 10 do
+	let TOTO = TOTO + 1;
+	if TOTO > 4 then break; endif;
+	if TOTO < 2 then continue; endif;
+	let TETE = TETE + 1;
+done;
+print TOTO;
+print TETE;
+
+for TOTO = 0 to 16 do
+	if TOTO < 3 then continue; endif;
+	if TOTO > 7 then break; endif;
+	let TETE = 1 << TOTO;
+	print TETE;
+next;
