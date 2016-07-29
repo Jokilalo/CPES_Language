@@ -1,0 +1,39 @@
+/* Use http://www.bottlecaps.de/rr/ui to render */
+
+Number		::= Digits | HexDigits  | BinDigits
+Ident		::= ( [a-zA-Z] | '_' )+
+Define		::= "#define" S Ident S Number
+
+PVal		::= (Number | Ident | Define)
+
+Remark		::= ( ("rem" | "//") Char* ControlLine) | Comment 
+
+Variable	::= "var" S Ident S? ';'
+
+
+Assignation	::= ("let" S)? Ident S '=' S PVal (Op S PVal)? S? ';'
+
+Label		::= "label" S Ident S? ';'
+Goto		::= "goto" S Ident S? ';'
+If			::= "if" S PVal S TestOp S PVal S "then"
+Else		::= "else"
+EndIf		::= "endif" S? ';'
+While		::= "while" S PVal S TestOp S PVal S "do"
+Done		::= "done" S? ';'
+Break		::= "break" ';'
+Continue	::= "continue" ';'
+For			::= "for" S Ident S '=' S PVal S "to" S PVal S ("step" S PVal S)? "do"
+Next		::= "next" ';'
+Exit		::= "exit" S PVal S? ';'
+
+
+Op			::= ("+" | "-" | "*" | "/" | "|" | "&" | "<<" | ">>")
+TestOp		::= ("=" | "|" | "&" | "<" | "<=" | ">" | ">=")
+ControlLine	::= (#xA | #xD)
+Space 	 	::= (#x9 | #x20)+
+S 	 	::= (Space | ControlLine)+
+Comment 	::= '/*' ( [^*] | '*'+ [^*/] )* '*'* '*/'
+HexDigits	::= '0' ('x' | 'X') ( Digits | [a-fA-F] )*
+BinDigits	::= '0' 'b' ('0' | '1')*
+Digits		::= [0-9]+
+Chars		::= [#x20-#xFF]
