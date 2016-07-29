@@ -5,7 +5,6 @@
 typedef unsigned long       DWORD;
 typedef unsigned char       BYTE;
 
-
 #ifndef __cplusplus /* In C++, 'bool', 'true' and 'false' and keywords */
   #define bool BYTE
   #define true 1
