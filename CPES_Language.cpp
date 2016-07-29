@@ -3,15 +3,18 @@
 
 #include "stdafx.h"
 #include "CPES_Language.h"
-#include <vector>
 #include <map>
+#include <list>
+#include <vector>
+#include <string>
+extern "C" {
 #include "CPES_Lang_Func.h"
 #include "CPES_Lang_Exec.h"
+};
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
-
 
 // Seul et unique objet application
 
@@ -23,6 +26,8 @@ typedef enum _eTokenType {
 	ettUnknow = 0,
 	ettREM,
 	ettREMSLASH,
+	ettBEGINREM,
+	ettENDREM,
 	ettVAR,
 	ettLET,
 	ettLABEL,
@@ -37,6 +42,7 @@ typedef enum _eTokenType {
 	ettFOR,
 	ettNEXT,
 	ettEXIT,
+	ettDEFINE,
 	ettMax
 } eTokenType;
 
@@ -44,6 +50,8 @@ char *arTokenCPES[ettMax] = {
 	"",
 	"rem",
 	"//",
+	"/*",
+	"*/",
 	"var",
 	"let",
 	"label",
@@ -57,7 +65,8 @@ char *arTokenCPES[ettMax] = {
 	"done;",
 	"for",
 	"next;",
-	"exit"
+	"exit",
+	"#define"
 };
 
 typedef enum _eTokenSign {
@@ -110,6 +119,7 @@ char *arTokenSigns[etsMax] = {
 };
 
 bool ParseCPESFile(char *fileName);
+bool WriteCPESPCode(char *fileName, char cOutputType, BYTE *pcode, int pcodeSize, int stackIdentifierSize, int stackSize);
 bool ParseCPESTexte(char *CPESText);
 eTokenType getTokenType(char *tokenString);
 
@@ -130,11 +140,14 @@ bool parseTTDONE(char *CPESTextIn, char **CPESTextOut);
 bool parseTTFOR(char *CPESTextIn, char **CPESTextOut);
 bool parseTTNEXT(char *CPESTextIn, char **CPESTextOut);
 bool parseTTEXIT(char *CPESTextIn, char **CPESTextOut);
+bool parseTTDEFINE(char *CPESTextIn, char **CPESTextOut);
 
 fnctTokenParse *arTokenParsers[ettMax] = {
 	NULL,
 	parseTTREM,
 	parseTTREM,
+	NULL,
+	NULL,
 	parseTTVAR,
 	parseTTLET,
 	parseTTLABEL,
@@ -148,10 +161,12 @@ fnctTokenParse *arTokenParsers[ettMax] = {
 	parseTTDONE,
 	parseTTFOR,
 	parseTTNEXT,
-	parseTTEXIT
+	parseTTEXIT,
+	parseTTDEFINE
 };
 
 std::vector<char *> gIdentifier;
+std::map<DWORD, std::string> gmapIdentifier;
 std::vector<char *> gLabels;
 std::vector<int> gLabelsRefPCode;
 std::vector<std::vector<int>> gLabelsRefInPCode;
@@ -163,6 +178,8 @@ std::vector<std::vector<int>> gIfLabelsPosWHILEBREAK;
 std::vector<int> gIfLabelsPosFOR;
 std::vector<int> gIfLabelsPosSTEPVALUE;
 std::vector<std::vector<int>> gIfLabelsPosNEXT;
+
+std::map<std::string, DWORD> gmapDefineValues;
 
 // Functions arrays
 int checkFunctionName(char *tokenString);
@@ -179,6 +196,7 @@ int posPCode;
 bool checkIdentifierExists(char *Identifier);
 bool parseValueSign(char *CPESTextIn, char **CPESTextOut, eTokenSign *etsType);
 bool parseIdentifier(char *CPESTextIn, char **CPESTextOut, char **Identifier);
+
 
 int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 {
@@ -229,14 +247,64 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 					// Jump Resolution fully finished
 					if (gIfLabelsPosTST.empty() == true) {
 						// No IF/ENDIF mismatch, Execute PCODE !!!!
+						char *PCodeOutBinaryFileName = "pcode.out";
+						char *PCodeOutCFileName = "pcode.out.c";
+						char *PCodeOutASMFileName = "pcode.out.a";
+
+						if (argc > 2) {
+							PCodeOutBinaryFileName = new char[strlen(argv[2])+1];
+							strcpy(PCodeOutBinaryFileName, argv[2]);
+						}
+						else {
+							PCodeOutBinaryFileName = new char[strlen(PCodeOutBinaryFileName)+1];
+							strcpy(PCodeOutBinaryFileName, "pcode.out");
+						}
+						if (argc > 3) {
+							PCodeOutCFileName = new char[strlen(argv[3])+1];
+							strcpy(PCodeOutCFileName, argv[3]);
+						}
+						else {
+							PCodeOutCFileName = new char[strlen(PCodeOutCFileName)+1];
+							strcpy(PCodeOutCFileName, "pcode.out.c");
+						}
+						if (argc > 4) {
+							PCodeOutASMFileName = new char[strlen(argv[3])+1];
+							strcpy(PCodeOutASMFileName, argv[3]);
+						}
+						else {
+							PCodeOutASMFileName = new char[strlen(PCodeOutASMFileName)+1];
+							strcpy(PCodeOutASMFileName, "pcode.out.a");
+						}
+
 						pcode[posPCode++] = pcsEXIT;
 						pcode[posPCode++] = pcsPUSHNumber; // Wont be pushed, just for exit value
 						*((DWORD *)&pcode[posPCode]) = 0;
 						posPCode += 4;
+
 						printf("PCODE size : %d\n", posPCode);
 						printf("Identifier Stack size : %d\n", posIdentifierStack);
 						printf("----------\n");
-						pCodeExecute(pcode, sizeof(pcode), identifierStack, sizeof(identifierStack), stack, sizeof(stack));
+
+						printf("Writing pcode binary file : %s\n", PCodeOutBinaryFileName);
+						if (WriteCPESPCode("pcode.out", 'b', pcode, posPCode, posIdentifierStack, sizeof(stack)) == true) {
+							printf("success write %s\n", PCodeOutBinaryFileName);
+						}
+
+						printf("Writing pcode c file : %s\n", PCodeOutCFileName);
+						if (WriteCPESPCode(PCodeOutCFileName, 'c', pcode, posPCode, posIdentifierStack, sizeof(stack)) == true) {
+							printf("success write %s\n", PCodeOutCFileName);
+						}
+
+						printf("Writing pcode ASM file : %s\n", PCodeOutASMFileName);
+						if (WriteCPESPCode(PCodeOutASMFileName, 'a', pcode, posPCode, posIdentifierStack, sizeof(stack)) == true) {
+							printf("success write %s\n", PCodeOutASMFileName);
+						}
+
+						delete PCodeOutBinaryFileName;
+						delete PCodeOutCFileName;
+						delete PCodeOutASMFileName;
+
+						pCodeExecute(pcode, posPCode, identifierStack, sizeof(identifierStack), stack, sizeof(stack));
 					}
 				}
 			}
@@ -244,6 +312,23 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			for (it = gIdentifier.begin(); it != gIdentifier.end(); it++) {
 				delete *it;
 			}
+			// -----------------------
+			// Clear all memory stacks
+			// -----------------------
+			gIdentifier.clear();
+			gmapIdentifier.clear();
+			gLabels.clear();
+			gLabelsRefPCode.clear();
+			gLabelsRefInPCode.clear();
+			gIfLabelsPosTST.clear();
+			gIfLabelsPosELSE.clear();
+			gIfLabelsPosWHILETST.clear();
+			gIfLabelsPosWHILE.clear();
+			gIfLabelsPosWHILEBREAK.clear();
+			gIfLabelsPosFOR.clear();
+			gIfLabelsPosSTEPVALUE.clear();
+			gIfLabelsPosNEXT.clear();
+			gmapDefineValues.clear();
 		}
 	}
 
@@ -281,132 +366,393 @@ bool ParseCPESFile(char *fileName)
 	return bRet;
 }
 
+bool WriteCPESPCode(char *fileName, char cOutputType, BYTE *pcode, int pcodeSize, int stackIdentifierSize, int stackSize)
+{
+	bool bRet = true;
+	FILE *fCPES = NULL;
+	if (cOutputType == 'b') {
+		fCPES = fopen(fileName, "wb");
+	}
+	else if (cOutputType == 'c') {
+		fCPES = fopen(fileName, "wt");
+	}
+	else if (cOutputType == 'a') {
+		fCPES = fopen(fileName, "wt");
+	}
+	if (fCPES != NULL) {
+		DWORD dwVal;
+		if (cOutputType == 'b') {
+			fwrite("CPES", 4, 1, fCPES);
+			dwVal = _CPES_PCOD_VERSION;
+			fwrite(&dwVal, 4, 1, fCPES);
+			dwVal = _CPES_FUNC_VERSION;
+			fwrite(&dwVal, 4, 1, fCPES);
+
+			dwVal = pcodeSize;
+			fwrite(&dwVal, 4, 1, fCPES);
+			dwVal = stackIdentifierSize;
+			fwrite(&dwVal, 4, 1, fCPES);
+			dwVal = stackSize;
+			fwrite(&dwVal, 4, 1, fCPES);
+
+			fwrite(pcode, 1, pcodeSize, fCPES);
+		}
+		else if (cOutputType == 'a') {
+			BYTE *ptrPCode = pcode;
+			DWORD dwOffset;
+			ePCodeSymbols pCodeByte;
+			int posPCode;
+
+			std::map<DWORD, std::string>::iterator it;
+
+			fprintf(fCPES, "; --------------------------------------\n");
+			fprintf(fCPES, "; PCODE desassembled File\n");
+			fprintf(fCPES, "; --------------------------------------\n");
+			fprintf(fCPES, "; CPES_PCOD_VERSION_GEN %08X\n", _CPES_PCOD_VERSION);
+			fprintf(fCPES, "; CPES_FUNC_VERSION_GEN %08X\n", _CPES_FUNC_VERSION);
+			fprintf(fCPES, "; Variable stack \n");
+			fprintf(fCPES, "VARSTCK:%08X\n", stackIdentifierSize);
+			for (dwOffset = 0, it = gmapIdentifier.begin(); it !=  gmapIdentifier.end(); it++, dwOffset += 4) {
+				fprintf(fCPES, "	%08X\t%d\t; %s\n", dwOffset, it->first, it->second.c_str());
+			}
+			fprintf(fCPES, "; PCode \n");
+
+			pCodeByte = pcsNOP;
+			posPCode = 0;
+
+			while (posPCode < pcodeSize) {
+				pCodeByte = (ePCodeSymbols)ptrPCode[posPCode];
+				fprintf(fCPES, "\t%08X\t", posPCode);
+				switch (pCodeByte) {
+				case pcsNOP : fprintf(fCPES, "NOP\n"); posPCode++; break;
+				case pcsPUSHNumber : posPCode++; fprintf(fCPES, "PSHN\t%08X\n", *((DWORD *)&ptrPCode[posPCode])); posPCode += 4; break;
+				case pcsPUSHIdentifier : posPCode++; fprintf(fCPES, "PSHI\t%d\t; %s\n", ptrPCode[posPCode], gmapIdentifier.find(ptrPCode[posPCode])->second.c_str()); posPCode++; break;
+				case pcsPOP : posPCode++; fprintf(fCPES, "POP\n"); break;
+				case pcsPOPV : posPCode++; fprintf(fCPES, "POPV\t%d\n", ptrPCode[posPCode]); posPCode++; break;
+				case pcsSETIdentifier : posPCode++; fprintf(fCPES, "SETI\t%d\t; %s\n", ptrPCode[posPCode], gmapIdentifier.find(ptrPCode[posPCode])->second.c_str()); posPCode++; break;
+				case pcsADD : posPCode++; fprintf(fCPES, "ADD\n"); break;
+				case pcsSUB : posPCode++; fprintf(fCPES, "SUB\n"); break;
+				case pcsMUL : posPCode++; fprintf(fCPES, "MUL\n"); break;
+				case pcsDIV : posPCode++; fprintf(fCPES, "DIV\n"); break;
+				case pcsBOR : posPCode++; fprintf(fCPES, "BOR\n"); break;
+				case pcsBAND : posPCode++; fprintf(fCPES, "BAND\n"); break;
+				case pcsBXOR : posPCode++; fprintf(fCPES, "BXOR\n"); break;
+				case pcsBNOT : posPCode++; fprintf(fCPES, "NOT\n"); break;
+				case pcsLSHFT : posPCode++; fprintf(fCPES, "LSHFT\n"); break;
+				case pcsRSHFT : posPCode++; fprintf(fCPES, "RSHFT\n"); break;
+				case pcsJMP : posPCode++; fprintf(fCPES, "JMP\t\t%08X\n", *((DWORD *)&ptrPCode[posPCode])); posPCode += 4; break;
+				case pcsJMPCOND : posPCode++; fprintf(fCPES, "JMPCOND\t%08X\n", *((DWORD *)&ptrPCode[posPCode])); posPCode += 4; break;
+				case pcsTSTEQ : posPCode++; fprintf(fCPES, "TSTEQ\n"); break;
+				case pcsTSTNEQ : posPCode++; fprintf(fCPES, "TSTNEQ\n"); break;
+				case pcsTSTGT : posPCode++; fprintf(fCPES, "TSTGT\n"); break;
+				case pcsTSTLT : posPCode++; fprintf(fCPES, "TSTLT\n"); break;
+				case pcsTSTBOR : posPCode++; fprintf(fCPES, "TSTBOR\n"); break;
+				case pcsTSTBAND : posPCode++; fprintf(fCPES, "TSTBAND\n"); break;
+				case pcsTSTGTOREQ : posPCode++; fprintf(fCPES, "TSTGTOREQ\n"); break;
+				case pcsTSTLTOREQ : posPCode++; fprintf(fCPES, "TSTLTOREQ\n"); break;
+				case pcsCALL :
+						posPCode++;
+						fprintf(fCPES, "CALL\t%d\t[%d]\t; %s\n", ptrPCode[posPCode], ptrPCode[posPCode+1], arFunctions[ptrPCode[posPCode]].funcName);
+						posPCode++;
+						posPCode++;
+						break;
+				case pcsEXIT : 
+						posPCode++;
+						if (ptrPCode[posPCode] == pcsPUSHNumber) {
+							posPCode++;
+							fprintf(fCPES, "EXTN\t%08X\n", *((DWORD *)&ptrPCode[posPCode]));
+							posPCode += 4;
+
+						}
+						else {
+							posPCode++;
+							fprintf(fCPES, "EXTI\t%d\t; %s\n", ptrPCode[posPCode], gmapIdentifier.find(ptrPCode[posPCode])->second.c_str());
+							posPCode++;
+						}
+						break;
+				};
+			}
+		}
+		else if (cOutputType == 'c') {
+			fprintf(fCPES, "// --------------------------------------\n");
+			fprintf(fCPES, "// PCODE File\n");
+			fprintf(fCPES, "// --------------------------------------\n");
+			fprintf(fCPES, "#include \n");
+			fprintf(fCPES, "#include <math.h>\n");
+			fprintf(fCPES, "#include <stdio.h>\n");
+			fprintf(fCPES, "#include <string.h>\n");
+			fprintf(fCPES, "#include <ctype.h>\n");
+			fprintf(fCPES, "#include <stdlib.h>\n");
+			fprintf(fCPES, "#include <string.h>\n");
+			fprintf(fCPES, "// --------------------------------------\n");
+			fprintf(fCPES, "#include \"CPES_Lang_Func.h\"\n");
+			fprintf(fCPES, "#include \"CPES_Lang_Exec.h\"\n");
+			fprintf(fCPES, "// --------------------------------------\n");
+			fprintf(fCPES, "// Defines\n");
+			fprintf(fCPES, "// --------------------------------------\n");
+			fprintf(fCPES, "#define CPES_PCOD_VERSION_GEN %08X\n", _CPES_PCOD_VERSION);
+			fprintf(fCPES, "#define CPES_FUNC_VERSION_GEN %08X\n", _CPES_FUNC_VERSION);
+			fprintf(fCPES, "#define PCode_Size %d\n", pcodeSize);
+			fprintf(fCPES, "#define PCode_StackIdentifierSize %d\n", stackIdentifierSize);
+			fprintf(fCPES, "#define PCode_StackSize %d\n", stackSize);
+			fprintf(fCPES, "// --------------------------------------\n");
+			fprintf(fCPES, "// Stacks\n");
+			fprintf(fCPES, "// --------------------------------------\n");
+			fprintf(fCPES, "BYTE	barStackIdentifier[PCode_StackIdentifierSize];\n");
+			fprintf(fCPES, "BYTE	barStack[PCode_StackSize];\n");
+			fprintf(fCPES, "// --------------------------------------\n");
+			fprintf(fCPES, "// Pcode\n");
+			fprintf(fCPES, "// --------------------------------------\n");
+			fprintf(fCPES, "const BYTE	barPCode[PCode_Size] = {\n");
+
+			for (dwVal = 0; dwVal < pcodeSize; dwVal++) {
+				if (dwVal > 0) {
+					fprintf(fCPES, ",");
+				}
+				if (dwVal && (dwVal % 32) == 0) {
+					fprintf(fCPES, "\n");
+				}
+				fprintf(fCPES, "0x%02X", pcode[dwVal]);
+			}
+
+			fprintf(fCPES, "\n};\n");
+
+			fprintf(fCPES, "// --------------------------------------\n");
+			fprintf(fCPES, "// Execute PCode \n");
+			fprintf(fCPES, "// --------------------------------------\n");
+			fprintf(fCPES, "/*\n");
+			fprintf(fCPES, "DWORD dwRet;\ndwRet = pCodeExecute(barPCode, PCode_Size, barStackIdentifier, PCode_StackIdentifierSize, barStack, PCode_StackSize);\n");
+			fprintf(fCPES, "*/\n");
+		}
+		fclose(fCPES);
+	}
+
+	return bRet;
+}
+
 bool ParseCPESTexte(char *CPESText)
 {
 	bool bRet = true;
 	char *parsePos = CPESText;
+	char *CPESTextInclude = NULL;
+	char *parsePosBeforeInclude = NULL;
 	char tokenBuff[64], *ptrToken = tokenBuff, *ptrTokenBegin = NULL;
 	eTokenType ettRunning = ettUnknow;
 	bool bEnteredQuote = false;
 	std::vector<char *> vecParameters;
+	bool bParse = true;
 
 	memset(tokenBuff, 0, sizeof(tokenBuff));
-
-	while (bRet == true && *parsePos != 0x00) {
-		if (ettRunning == ettUnknow) {
-			if (isspace(*parsePos) == 0) {
-				// Not space
-				if (ptrTokenBegin == NULL)
-					ptrTokenBegin = parsePos;
-				*ptrToken++ = *parsePos;
-			}
-			else {
-				if (ptrToken != &tokenBuff[0]) {
-					int iFunctionCall = -1;
-					char *functionIdentifier = NULL;
-					// token to analyse
-					ettRunning = getTokenType(tokenBuff);
-					// jump to next token
-					while (*parsePos != 0x00 && isspace(*parsePos) != 0) {
-						parsePos++;
-					}
-					if (ettRunning == ettUnknow) {
-						if (checkIdentifierExists(tokenBuff) == true) {
-							// Try to see if it's an identifier assignation
-							char *CPESTextIn = parsePos;
-							char *CPESTextOut;
-							eTokenSign signEqual;
-							if (parseValueSign(CPESTextIn, &CPESTextOut, &signEqual) == true && signEqual == etsEqual) {
-								// it is, now try to see if it's a function call
-								CPESTextIn = CPESTextOut;
-								if (parseIdentifier(CPESTextIn, &CPESTextOut, &functionIdentifier) == true) {
-									// check identifier vs available functions
-									iFunctionCall = checkFunctionName(functionIdentifier);
-									if (iFunctionCall == -1) {
-										// LET
-										ettRunning = ettLET;
-										parsePos = ptrTokenBegin;
-									}
-									else {
-										parsePos = CPESTextOut;
-									}
-								}
-							}
-						}
-						else {
-							// Is it a "void" call ?
-							iFunctionCall = checkFunctionName(tokenBuff);
-							if (iFunctionCall != -1) {
-								// it is
-								tokenBuff[0] = 0x0; // No return value, void call
-							}
-						}
-					}
-
-					bRet = false;
-					if (iFunctionCall == -1) {
-						if (arTokenParsers[ettRunning] != NULL) {
-							// call specialized parser
-							bRet = arTokenParsers[ettRunning](parsePos, &parsePos);
-						}
-					}
-					else {
-						bRet = parseFunctionCall(iFunctionCall, tokenBuff, parsePos, &parsePos);
-					}
-
-					if (bRet == false) {
-						printf("Error near : %s position %d\n", tokenBuff, parsePos-CPESText);
-					}
-
-					// empty token buffer
-					ptrToken = &tokenBuff[0];
-					ptrTokenBegin = NULL;
-					memset(tokenBuff, 0, sizeof(tokenBuff));
-
-					if (functionIdentifier != NULL) {
-						delete functionIdentifier;
-					}
-
-					ettRunning = ettUnknow;
-				}
-				else {
-					// token still empty
-				}
-			}
+	
+	do {
+		if (parsePosBeforeInclude != NULL) {
+			parsePos = parsePosBeforeInclude;
+			parsePosBeforeInclude = NULL;
+			delete CPESTextInclude;
+			CPESTextInclude = NULL;
 		}
-		else {
-			// Token is running
-			if (isspace(*parsePos) == 0) {
-				// Not space
-				if (*ptrToken == '"') {
-					// If quote string mark it or leave it
-					bEnteredQuote = !bEnteredQuote;
-				}
-				if (ptrTokenBegin == NULL)
-					ptrTokenBegin = parsePos;
-				*ptrToken++ = *parsePos;
-			}
-			else {
-				// Space
-				if (bEnteredQuote == true) {
+		while (bRet == true && *parsePos != 0x00) {
+			if (ettRunning == ettUnknow) {
+				if (*parsePos > 64 || *parsePos < 0 || isspace(*parsePos) == 0) {
+					// Not space
 					if (ptrTokenBegin == NULL)
 						ptrTokenBegin = parsePos;
 					*ptrToken++ = *parsePos;
 				}
 				else {
-					// Add argument for the function call
 					if (ptrToken != &tokenBuff[0]) {
-						char *tokenParam = new char[(&tokenBuff[0] - ptrToken)+1];
-						
-						memset(tokenParam, 0, (&tokenBuff[0] - ptrToken)+1);
-						memcpy(tokenParam, &tokenBuff[0], (&tokenBuff[0] - ptrToken)+1);
+						int iFunctionCall = -1;
+						char *functionIdentifier = NULL;
+						// token to analyse
+						ettRunning = getTokenType(tokenBuff);
+						// jump to next token
+						while (*parsePos != 0x00 && isspace(*parsePos) != 0) {
+							parsePos++;
+						}
+						if (ettRunning == ettUnknow) {
+							if (checkIdentifierExists(tokenBuff) == true) {
+								// Try to see if it's an identifier assignation
+								char *CPESTextIn = parsePos;
+								char *CPESTextOut;
+								eTokenSign signEqual;
+								if (parseValueSign(CPESTextIn, &CPESTextOut, &signEqual) == true && signEqual == etsEqual) {
+									// it is, now try to see if it's a function call
+									CPESTextIn = CPESTextOut;
+									if (parseIdentifier(CPESTextIn, &CPESTextOut, &functionIdentifier) == true) {
+										// check identifier vs available functions
+										iFunctionCall = checkFunctionName(functionIdentifier);
+										if (iFunctionCall == -1) {
+											// LET
+											ettRunning = ettLET;
+											parsePos = ptrTokenBegin;
+										}
+										else {
+											parsePos = CPESTextOut;
+										}
+									}
+								}
+							}
+							else {
+								// Is it a "void" call ?
+								iFunctionCall = checkFunctionName(tokenBuff);
+								if (iFunctionCall != -1) {
+									// it is
+									tokenBuff[0] = 0x0; // No return value, void call
+								}
+								else {
+									if (bParse == true && strcmp(tokenBuff, "include") == 0) {
+										if (parsePosBeforeInclude == NULL) {
+											FILE *fCPES;
+											bool bIncludeOk = false;
+											char memC;
+											char *posNewLine;
+											char *posFileName;
+											for (posFileName = NULL, posNewLine = parsePos; *posNewLine != 0x0 && *posNewLine != '\r' && *posNewLine != '\n'; posNewLine++) {
+												if (isspace(*posNewLine) == 0 && posFileName == NULL) {
+													posFileName = posNewLine;
+												}
+											}
 
-						vecParameters.push_back(tokenParam);
+											memC = *posNewLine;
+											*posNewLine = 0x0;
+
+											fCPES = fopen(posFileName, "r");
+											if (fCPES != NULL) {
+												fpos_t posCPES;
+												fseek(fCPES, 0, SEEK_END);
+												if (fgetpos(fCPES, &posCPES) == 0) {
+													char *CPESPtr;
+													CPESPtr = CPESTextInclude = new char[posCPES+1];
+													if (CPESTextInclude != NULL) {
+														int c;
+														fseek(fCPES, 0, SEEK_SET);
+														memset(CPESTextInclude, 0, posCPES+1);
+														do {
+															c = fgetc(fCPES);
+															if (c != EOF) {
+																*CPESPtr = c;
+																CPESPtr++;
+															}
+														} while (c != EOF);
+														bIncludeOk = true;
+													}
+												}
+												fclose(fCPES);
+											}
+											if (bIncludeOk == true) {
+												printf("Including file : %s\n", posFileName);
+												*posNewLine = memC;
+												parsePosBeforeInclude = posNewLine;
+												parsePos = CPESTextInclude;
+												bRet = true;
+											}
+										}
+									}
+								}
+							}
+						}
+
+						if (parsePos != CPESTextInclude) {
+							bRet = true;
+							if (iFunctionCall == -1) {
+								if (ettRunning == ettBEGINREM) {
+									bParse = false;
+									bRet = true;
+									parsePos--;
+								}
+								else if (ettRunning == ettENDREM) {
+									bParse = true;
+									bRet = true;
+									parsePos--;
+								} else if (bParse == true) {
+									if (arTokenParsers[ettRunning] != NULL) {
+										// call specialized parser
+										bRet = arTokenParsers[ettRunning](parsePos, &parsePos);
+									}
+									else {
+										bRet = false;
+									}
+								}
+								else {
+									parsePos--;
+								}
+							}
+							else {
+								bRet = parseFunctionCall(iFunctionCall, tokenBuff, parsePos, &parsePos);
+							}
+
+							if (bRet == false) {
+								char *posNewLine;
+								if (ptrTokenBegin == NULL) {
+									ptrTokenBegin = parsePos;
+								}
+								for (posNewLine = ptrTokenBegin; *posNewLine != 0x0 && *posNewLine != '\r' && *posNewLine != '\n'; posNewLine++);
+								*posNewLine = 0x0;
+								if (iFunctionCall == -1)
+									printf("Error near : %s position %d :\n%s\n", tokenBuff, parsePos-CPESText, ptrTokenBegin);
+								else
+									printf("Error in function call near : %s position %d :\n%s\n", arFunctions[iFunctionCall].funcName, parsePos-CPESText, ptrTokenBegin);
+							}
+						}
+						else {
+								parsePos--; // Because of ++ in the end of the while
+						}
+
+						// empty token buffer
+						ptrToken = &tokenBuff[0];
+						ptrTokenBegin = NULL;
+						memset(tokenBuff, 0, sizeof(tokenBuff));
+
+						if (functionIdentifier != NULL) {
+							delete functionIdentifier;
+						}
+
+						ettRunning = ettUnknow;
+					}
+					else {
+						// token still empty
 					}
 				}
 			}
+			else {
+				// Token is running
+				if (isspace(*parsePos) == 0) {
+					// Not space
+					if (*ptrToken == '"') {
+						// If quote string mark it or leave it
+						bEnteredQuote = !bEnteredQuote;
+					}
+					if (ptrTokenBegin == NULL)
+						ptrTokenBegin = parsePos;
+					*ptrToken++ = *parsePos;
+				}
+				else {
+					// Space
+					if (bEnteredQuote == true) {
+						if (ptrTokenBegin == NULL)
+							ptrTokenBegin = parsePos;
+						*ptrToken++ = *parsePos;
+					}
+					else {
+						// Add argument for the function call
+						if (ptrToken != &tokenBuff[0]) {
+							char *tokenParam = new char[(&tokenBuff[0] - ptrToken)+1];
+							
+							memset(tokenParam, 0, (&tokenBuff[0] - ptrToken)+1);
+							memcpy(tokenParam, &tokenBuff[0], (&tokenBuff[0] - ptrToken)+1);
+
+							vecParameters.push_back(tokenParam);
+						}
+					}
+				}
+			}
+			parsePos++;
 		}
-		parsePos++;
+	} while (parsePosBeforeInclude != NULL);
+
+	if (CPESTextInclude != NULL) {
+		delete CPESTextInclude;
+		CPESTextInclude = NULL;
 	}
 
 	return bRet;
@@ -646,10 +992,12 @@ bool parseTTVAR(char *CPESTextIn, char **CPESTextOut)
 	char *Identifier = NULL;
 
 	if (parseIdentifier(CPESTextIn, CPESTextOut, &Identifier) == true &&
-		checkIdentifierExists(Identifier) == false &&
+		checkIdentifierExists(Identifier) == false && gmapDefineValues.find(std::string(Identifier)) == gmapDefineValues.end() &&
 		**CPESTextOut == ';') {
+		DWORD dwStize = gIdentifier.size();
 		(*CPESTextOut)++;
 		gIdentifier.push_back(Identifier);
+		gmapIdentifier.insert(std::map<DWORD, std::string>::value_type(dwStize, std::string(Identifier)));
 		bRet = true;
 	}
 
@@ -695,7 +1043,13 @@ bool parseTTLET(char *CPESTextIn, char **CPESTextOut)
 						bRet = true;
 					}
 					else {
-						delete IdentifierValue;
+						if (gmapDefineValues.find(std::string(IdentifierValue)) != gmapDefineValues.end()) {
+							Number = gmapDefineValues.find(std::string(IdentifierValue))->second;
+							delete IdentifierValue;
+							IdentifierValue = NULL;
+							bRet = true;
+						}
+						// IdentifierValue delete when exit;
 					}
 				}
 				else {
@@ -723,6 +1077,12 @@ bool parseTTLET(char *CPESTextIn, char **CPESTextOut)
 										bRet = true;
 									}
 									else {
+										if (gmapDefineValues.find(std::string(IdentifierValueR)) != gmapDefineValues.end()) {
+											NumberR = gmapDefineValues.find(std::string(IdentifierValueR))->second;
+											delete IdentifierValueR;
+											IdentifierValueR = NULL;
+											bRet = true;
+										}
 										// IdentifierValueR delete when exit;
 									}
 								}
@@ -821,10 +1181,12 @@ bool parseTTLET(char *CPESTextIn, char **CPESTextOut)
 		pcode[posPCode++] = pcsSETIdentifier;
 		pcode[posPCode++] = getIdentifierStackIndice(Identifier);
 		// POP
-		pcode[posPCode++] = pcsPOP;
 		if (bAssign == false) {
 			// POP + POP
-			pcode[posPCode++] = pcsPOP;
+			pcode[posPCode++] = pcsPOPV;
+			pcode[posPCode++] = 3;
+		}
+		else {
 			pcode[posPCode++] = pcsPOP;
 		}
 	}
@@ -965,7 +1327,13 @@ bool parseTTIF(char *CPESTextIn, char **CPESTextOut)
 				bRet = true;
 			}
 			else {
-				delete IdentifierValue;
+				if (gmapDefineValues.find(std::string(IdentifierValue)) != gmapDefineValues.end()) {
+					Number = gmapDefineValues.find(std::string(IdentifierValue))->second;
+					delete IdentifierValue;
+					IdentifierValue = NULL;
+					bRet = true;
+				}
+				// IdentifierValue delete when exit
 			}
 		}
 		else {
@@ -987,6 +1355,12 @@ bool parseTTIF(char *CPESTextIn, char **CPESTextOut)
 							bRet = true;
 						}
 						else {
+							if (gmapDefineValues.find(std::string(IdentifierValueR)) != gmapDefineValues.end()) {
+								NumberR = gmapDefineValues.find(std::string(IdentifierValueR))->second;
+								delete IdentifierValueR;
+								IdentifierValueR = NULL;
+								bRet = true;
+							}
 							// IdentifierValueR delete when exit;
 						}
 					}
@@ -1072,8 +1446,8 @@ bool parseTTIF(char *CPESTextIn, char **CPESTextOut)
 		}
 
 		// POP + POP 
-		pcode[posPCode++] = pcsPOP;
-		pcode[posPCode++] = pcsPOP;
+		pcode[posPCode++] = pcsPOPV;
+		pcode[posPCode++] = 2;
 
 		// JUMP if TST fail to the ELSE or ENDIF
 		pcode[posPCode++] = pcsJMPCOND;
@@ -1175,7 +1549,13 @@ bool parseTTWHILE(char *CPESTextIn, char **CPESTextOut)
 				bRet = true;
 			}
 			else {
-				delete IdentifierValue;
+				if (gmapDefineValues.find(std::string(IdentifierValue)) != gmapDefineValues.end()) {
+					Number = gmapDefineValues.find(std::string(IdentifierValue))->second;
+					delete IdentifierValue;
+					IdentifierValue = NULL;
+					bRet = true;
+				}
+				// delete IdentifierValue when exit
 			}
 		}
 		else {
@@ -1197,6 +1577,12 @@ bool parseTTWHILE(char *CPESTextIn, char **CPESTextOut)
 							bRet = true;
 						}
 						else {
+							if (gmapDefineValues.find(std::string(IdentifierValueR)) != gmapDefineValues.end()) {
+								NumberR = gmapDefineValues.find(std::string(IdentifierValueR))->second;
+								delete IdentifierValueR;
+								IdentifierValueR = NULL;
+								bRet = true;
+							}
 							// IdentifierValueR delete when exit;
 						}
 					}
@@ -1284,8 +1670,8 @@ bool parseTTWHILE(char *CPESTextIn, char **CPESTextOut)
 		}
 
 		// POP + POP 
-		pcode[posPCode++] = pcsPOP;
-		pcode[posPCode++] = pcsPOP;
+		pcode[posPCode++] = pcsPOPV;
+		pcode[posPCode++] = 2;
 
 		// JUMP if TST fail to the ELSE or ENDIF
 		pcode[posPCode++] = pcsJMPCOND;
@@ -1488,7 +1874,13 @@ bool parseTTFOR(char *CPESTextIn, char **CPESTextOut)
 					bRet = true;
 				}
 				else {
-					delete IdentifierValue;
+					if (gmapDefineValues.find(std::string(IdentifierValue)) != gmapDefineValues.end()) {
+						Number = gmapDefineValues.find(std::string(IdentifierValue))->second;
+						delete IdentifierValue;
+						IdentifierValue = NULL;
+						bRet = true;
+					}
+					// delete IdentifierValue when exit
 				}
 			}
 			else {
@@ -1514,6 +1906,12 @@ bool parseTTFOR(char *CPESTextIn, char **CPESTextOut)
 								bRet = true;
 							}
 							else {
+								if (gmapDefineValues.find(std::string(IdentifierValueR)) != gmapDefineValues.end()) {
+									NumberR = gmapDefineValues.find(std::string(IdentifierValueR))->second;
+									delete IdentifierValueR;
+									IdentifierValueR = NULL;
+									bRet = true;
+								}
 								// IdentifierValueR delete when exit;
 							}
 						}
@@ -1548,6 +1946,12 @@ bool parseTTFOR(char *CPESTextIn, char **CPESTextOut)
 												bRet = true;
 											}
 											else {
+												if (gmapDefineValues.find(std::string(IdentifierValueS)) != gmapDefineValues.end()) {
+													NumberR = gmapDefineValues.find(std::string(IdentifierValueS))->second;
+													delete IdentifierValueS;
+													IdentifierValueS = NULL;
+													bRet = true;
+												}
 												// IdentifierValueS delete when exit;
 											}
 										}
@@ -1633,8 +2037,8 @@ bool parseTTFOR(char *CPESTextIn, char **CPESTextOut)
 		pcode[posPCode++] = pcsTSTLTOREQ;
 
 		// POP + POP 
-		pcode[posPCode++] = pcsPOP;
-		pcode[posPCode++] = pcsPOP;
+		pcode[posPCode++] = pcsPOPV;
+		pcode[posPCode++] = 2;
 
 		// JUMP if TST fail to the end of for loop
 		pcode[posPCode++] = pcsJMPCOND;
@@ -1693,9 +2097,8 @@ bool parseTTNEXT(char *CPESTextIn, char **CPESTextOut)
 		pcode[posPCode++] = pcsSETIdentifier;
 		pcode[posPCode++] = pcode[gIfLabelsPosFOR.back()+1]; // identifier id
 		// POP
-		pcode[posPCode++] = pcsPOP;
-		pcode[posPCode++] = pcsPOP;
-		pcode[posPCode++] = pcsPOP;
+		pcode[posPCode++] = pcsPOPV;
+		pcode[posPCode++] = 3;
 
 		pcode[posPCode++] = pcsJMP;
 		ptrDWORD = (DWORD *)&pcode[posPCode];
@@ -1740,15 +2143,24 @@ bool parseTTEXIT(char *CPESTextIn, char **CPESTextOut)
 				bRet = true;
 			}
 			else {
-				delete Identifier;
-				Identifier = NULL;
-				bRet = false;
+				if (gmapDefineValues.find(std::string(Identifier)) != gmapDefineValues.end()) {
+					Number = gmapDefineValues.find(std::string(Identifier))->second;
+					delete Identifier;
+					Identifier = NULL;
+					bRet = true;
+				}
+				else {
+					delete Identifier;
+					Identifier = NULL;
+					bRet = false;
+				}
 			}
 		}
 		else {
 			// It's a number
 			bRet = true;
 		}
+
 		if (bRet == true) {
 			// next should be ';'
 			if (**CPESTextOut == ';') {
@@ -1790,6 +2202,34 @@ bool parseTTEXIT(char *CPESTextIn, char **CPESTextOut)
 	return bRet;
 }
 
+bool parseTTDEFINE(char *CPESTextIn, char **CPESTextOut)
+{
+	bool bRet = true;
+
+	char *Identifier = NULL;
+	DWORD Number;
+
+	if (parseIdentifier(CPESTextIn, CPESTextOut, &Identifier) == true) {
+		CPESTextIn = *CPESTextOut;
+		if (parseValueNumber(CPESTextIn, CPESTextOut, &Number) == true &&
+				checkIdentifierExists(Identifier) == false &&
+				gmapDefineValues.find(std::string(Identifier)) == gmapDefineValues.end()) {
+			std::string strKey(Identifier);
+			gmapDefineValues.insert(std::map<std::string, DWORD>::value_type(strKey, Number));
+			bRet = true;
+		}
+	}
+	else {
+		bRet = false;
+	}
+
+	if (Identifier != NULL) {
+		delete Identifier;
+	}
+
+	return bRet;
+}
+
 bool parseFunctionCall(int iFunctionCall, char *Identifier, char *CPESTextIn, char **CPESTextOut)
 {
 	typedef struct _stIdentOrNumber {
@@ -1817,6 +2257,16 @@ bool parseFunctionCall(int iFunctionCall, char *Identifier, char *CPESTextIn, ch
 		if (bRet == false) {
 			bRet = parseIdentifier(CPESTextIn, CPESTextOut, &tmpIorN.Identifier);
 			tmpIorN.bIdent = bRet;
+			if (bRet == true &&
+					gmapDefineValues.find(std::string(tmpIorN.Identifier)) != gmapDefineValues.end()) {
+				DWORD dwDefineValue = gmapDefineValues.find(std::string(tmpIorN.Identifier))->second;
+				delete tmpIorN.Identifier;
+				tmpIorN.Identifier = NULL; // stupid as it is a union
+				tmpIorN.Number = dwDefineValue;
+				tmpIorN.bIdent = false;
+				bRet = true;
+			}
+
 		}
 		if (bRet == true) {
 			bRet = false;
@@ -1871,6 +2321,11 @@ bool parseFunctionCall(int iFunctionCall, char *Identifier, char *CPESTextIn, ch
 		}
 	}
 
+	if (vectParameters.size() == 0 && *functionDef.argdef != 0) {
+		// Missing parameter
+		bRet = false;
+	}
+
 	if (bRet == true) {
 		// All is good, now construct pcode
 		DWORD *ptrDWORD;
@@ -1903,11 +2358,14 @@ bool parseFunctionCall(int iFunctionCall, char *Identifier, char *CPESTextIn, ch
 			pcode[posPCode++] = getIdentifierStackIndice(Identifier);
 		}
 		// POP (result)
-		pcode[posPCode++] = pcsPOP;
+		pcode[posPCode++] = pcsPOPV;
 		// POP argumets
+		pcode[posPCode++] = 1 + vectParameters.size();
+		/*
 		for (itVP = vectParameters.begin(); itVP != vectParameters.end(); itVP++) {
 			pcode[posPCode++] = pcsPOP;
 		}
+		*/
 	}
 
 	// Clean up

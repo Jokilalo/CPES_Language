@@ -173,12 +173,44 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\CPES_Lang_Exec.cpp"
+				RelativePath=".\CPES_Lang_Exec.c"
 				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="0"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="0"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
-				RelativePath=".\CPES_Lang_Func.cpp"
+				RelativePath=".\CPES_Lang_Func.c"
 				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="0"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="0"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath=".\CPES_Language.cpp"
@@ -223,6 +255,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\CPES_type.h"
+				>
+			</File>
+			<File
 				RelativePath=".\Resource.h"
 				>
 			</File>
@@ -245,6 +281,18 @@
 				>
 			</File>
 		</Filter>
+		<File
+			RelativePath=".\CPES_EBNF.txt"
+			>
+		</File>
+		<File
+			RelativePath=".\CPES_EBNF_diagram.xhtml"
+			>
+		</File>
+		<File
+			RelativePath=".\defvars.cpes"
+			>
+		</File>
 		<File
 			RelativePath=".\ReadMe.txt"
 			>

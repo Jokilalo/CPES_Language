@@ -1,8 +1,21 @@
+/*
+	Test programm to see how the parser is going on and
+	also how the pcode is generated and running
+*/
+include defvars.cpes
 rem Déclaration des variables
 var TOTO;
 var TETE;
+var X;
 
-for TOTO = 0 to 8 do
+TOTO = 0x123456; // Test assignation 
+X = TOTO;
+
+TOTO = V1 * V4;
+print TOTO;
+sleep 5000;
+
+for TOTO = 0 to V4 do
 	let TETE = 1 << TOTO;
 	print TETE;
 next;
@@ -76,7 +89,8 @@ print TOTO;
 let TOTO = 0;
 let TETE = 0;
 rem boucle "tant que"
-while TOTO != 10 do
+sleep 1000;
+while TOTO != V4 do
 	let TOTO = TOTO + 1;
 	if TOTO > 4 then break; endif;
 	if TOTO < 2 then continue; endif;
@@ -84,6 +98,7 @@ while TOTO != 10 do
 done;
 print TOTO;
 print TETE;
+sleep 5000;
 
 for TOTO = 0 to 16 do
 	if TOTO < 3 then continue; endif;
@@ -91,3 +106,4 @@ for TOTO = 0 to 16 do
 	let TETE = 1 << TOTO;
 	print TETE;
 next;
+sleep 5000;
