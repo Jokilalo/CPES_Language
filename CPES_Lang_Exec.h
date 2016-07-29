@@ -33,6 +33,7 @@ typedef enum _ePCodeSymbols {
  pcsTSTGTOREQ,
  pcsTSTLTOREQ,
  pcsCALL,
+ pcsCALLVOID,
  pcsEXIT
 } ePCodeSymbols;
 

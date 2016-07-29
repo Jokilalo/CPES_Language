@@ -456,6 +456,12 @@ bool WriteCPESPCode(char *fileName, char cOutputType, BYTE *pcode, int pcodeSize
 						posPCode++;
 						posPCode++;
 						break;
+				case pcsCALLVOID :
+						posPCode++;
+						fprintf(fCPES, "CALLVOID\t%d\t[%d]\t; %s\n", ptrPCode[posPCode], ptrPCode[posPCode+1], arFunctions[ptrPCode[posPCode]].funcName);
+						posPCode++;
+						posPCode++;
+						break;
 				case pcsEXIT : 
 						posPCode++;
 						if (ptrPCode[posPCode] == pcsPUSHNumber) {
@@ -2342,13 +2348,20 @@ bool parseFunctionCall(int iFunctionCall, char *Identifier, char *CPESTextIn, ch
 				posPCode += 4;
 			}
 		}
-		// Push number on stack for function result
-		pcode[posPCode++] = pcsPUSHNumber;
-		ptrDWORD = (DWORD *)&pcode[posPCode];
-		*ptrDWORD = 0;
-		posPCode += 4;
+		if (*Identifier != 0) {
+			// Push number on stack for function result
+			pcode[posPCode++] = pcsPUSHNumber;
+			ptrDWORD = (DWORD *)&pcode[posPCode];
+			*ptrDWORD = 0;
+			posPCode += 4;
+		}
 		// Make function call
-		pcode[posPCode++] = pcsCALL;
+		if (*Identifier != 0x0) {
+			pcode[posPCode++] = pcsCALL;
+		}
+		else {
+			pcode[posPCode++] = pcsCALLVOID;
+		}
 		pcode[posPCode++] = iFunctionCall; // No more than 255 functions
 		pcode[posPCode++] = vectParameters.size(); // No more than 255 arguments
 		// test void call
@@ -2359,8 +2372,13 @@ bool parseFunctionCall(int iFunctionCall, char *Identifier, char *CPESTextIn, ch
 		}
 		// POP (result)
 		pcode[posPCode++] = pcsPOPV;
-		// POP argumets
-		pcode[posPCode++] = 1 + vectParameters.size();
+		// POP arguments
+		if (*Identifier != 0x0) {
+			pcode[posPCode++] = 1 + vectParameters.size();
+		}
+		else {
+			pcode[posPCode++] = vectParameters.size();
+		}
 		/*
 		for (itVP = vectParameters.begin(); itVP != vectParameters.end(); itVP++) {
 			pcode[posPCode++] = pcsPOP;

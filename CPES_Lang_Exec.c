@@ -230,6 +230,18 @@ DWORD pCodeExecute(const BYTE *ptrPCode, int PCodeLen, BYTE *ptrStackIdentifier,
 
 			posPCode++;
 			break;
+		case pcsCALLVOID :
+			posPCode++;
+
+			// This work with microsoft compiler but not arm compiler
+			//*((DWORD *)&ptrStack[posStack-4]) = arFunctionsCALL[ptrPCode[posPCode++]](ptrPCode[posPCode], ((DWORD *)&ptrStack[posStack-4-(ptrPCode[posPCode]*4)]));
+
+			// This works in both compiler :)
+			arFunctionsCALL[ptrPCode[posPCode]](ptrPCode[posPCode+1], ((DWORD *)&ptrStack[posStack-(ptrPCode[posPCode+1]*4)]));
+			posPCode++;
+
+			posPCode++;
+			break;
 		case pcsEXIT :
 			posPCode++;
 			if (ptrPCode[posPCode] == pcsPUSHNumber) {
