@@ -1,8 +1,8 @@
+#include "CPES_Type.h"
 
-#include "stdafx.h"
-#include "CPES_Language.h"
-#include <vector>
-#include <map>
+#ifndef _CPES_FUNC_VERSION
+#define _CPES_FUNC_VERSION 0x00010000
+#endif
 
 typedef struct _stFunctionDef {
 	char *funcName;
