@@ -17,9 +17,9 @@ Label		::= "label" S Ident S? ';'
 Goto		::= "goto" S Ident S? ';'
 If			::= "if" S PVal S TestOp S PVal S "then"
 Else		::= "else"
-EndIf		::= "endif" S? ';'
+EndIf		::= "endif" ';'
 While		::= "while" S PVal S TestOp S PVal S "do"
-Done		::= "done" S? ';'
+Done		::= "done" ';'
 Break		::= "break" ';'
 Continue	::= "continue" ';'
 For			::= "for" S Ident S '=' S PVal S "to" S PVal S ("step" S PVal S)? "do"
