@@ -1,11 +1,5 @@
 /* Use http://www.bottlecaps.de/rr/ui to render */
 
-Number		::= Digits | HexDigits  | BinDigits
-Ident		::= ( [a-zA-Z] | '_' )+
-Define		::= "#define" S Ident S Number
-
-PVal		::= (Number | Ident | Define)
-
 Remark		::= ( ("rem" | "//") Char* ControlLine) | Comment 
 
 Variable	::= "var" S Ident S? ';'
@@ -27,13 +21,19 @@ Next		::= "next" ';'
 Exit		::= "exit" S PVal S? ';'
 
 
+Number		::= Digits | HexDigits  | BinDigits
+Ident		::= ( [a-zA-Z] | '_' )+
+Define		::= "#define" S Ident S Number
+
+PVal		::= (Number | Ident | Define)
+
 Op			::= ("+" | "-" | "*" | "/" | "|" | "&" | "<<" | ">>")
 TestOp		::= ("=" | "|" | "&" | "<" | "<=" | ">" | ">=")
-ControlLine	::= (#xA | #xD)
+ControlLine	::= (#xA | #xD)+
 Space 	 	::= (#x9 | #x20)+
 S 	 	::= (Space | ControlLine)+
-Comment 	::= '/*' ( [^*] | '*'+ [^*/] )* '*'* '*/'
-HexDigits	::= '0' ('x' | 'X') ( Digits | [a-fA-F] )*
-BinDigits	::= '0' 'b' ('0' | '1')*
+Comment 	::= '/*' (Chars)+ (ControlLine)+ '*/'
+HexDigits	::= '0' ('x' | 'X') ( Digits | [a-fA-F] )+
+BinDigits	::= '0' 'b' ('0' | '1')+
 Digits		::= [0-9]+
 Chars		::= [#x20-#xFF]
