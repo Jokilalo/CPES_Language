@@ -10,6 +10,7 @@
 #include "CPES_Lang_Exec.h"
 
 
+int maxStack = 0;
 // PCOde Execution
 DWORD pCodeExecute(const BYTE *ptrPCode, int PCodeLen, BYTE *ptrStackIdentifier, int StackIdentifierLen, BYTE *ptrStack, int StackLen)
 {
@@ -18,7 +19,9 @@ DWORD pCodeExecute(const BYTE *ptrPCode, int PCodeLen, BYTE *ptrStackIdentifier,
 	ePCodeSymbols pCodeByte;
 	DWORD *ptrDWORDSrc, *ptrDWORDDst, *ptrOP1, *ptrOP2;
 	int posPCode;
-	int posStack, maxStack = 0;
+	int posStack;
+
+	maxStack = 0;
 
 	TSTInstructionResult = false;
 	posPCode = 0;

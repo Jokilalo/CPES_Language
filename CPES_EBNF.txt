@@ -4,7 +4,6 @@ Remark		::= ( ("rem" | "//") Char* ControlLine) | Comment
 
 Variable	::= "var" S Ident S? ';'
 
-
 Assignation	::= ("let" S)? Ident S '=' S PVal (Op S PVal)? S? ';'
 
 Label		::= "label" S Ident S? ';'
@@ -24,6 +23,7 @@ Exit		::= "exit" S PVal S? ';'
 Number		::= Digits | HexDigits  | BinDigits
 Ident		::= ( [a-zA-Z] | '_' )+
 Define		::= "#define" S Ident S Number
+Pragma		::= "#pragma" S Ident S String
 
 PVal		::= (Number | Ident | Define)
 
@@ -37,3 +37,7 @@ HexDigits	::= '0' ('x' | 'X') ( Digits | [a-fA-F] )+
 BinDigits	::= '0' 'b' ('0' | '1')+
 Digits		::= [0-9]+
 Chars		::= [#x20-#xFF]
+EscapeOctal	::= [0-7] [0-7] [0-7]
+EscapeHexa	::= 'x' ( Digits | [a-fA-F] ) ( Digits | [a-fA-F] )
+EscapeExp	::= '\\' ('a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v' | EscapeOctal | EscapeHexa | '\\') 
+String	::= '"' (Chars | EscapeExp)+ '"'

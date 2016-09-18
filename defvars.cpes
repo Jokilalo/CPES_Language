@@ -1,18 +1,224 @@
-/*
-This is sample file containing only
-some commonly defined values
-*/
-#define V1	123
-#define V2	456
-#define V3	789
-#define V4	0xA
+// -----------------------------
+//          NPUT PINS
+// -----------------------------
 
-#define GPIO_A	0
-#define GPIO_B	1
-#define GPIO_C	2
-#define GPIO_D	3
-#define GPIO_E	4
-#define GPIO_F	5
-#define GPIO_G	6
-#define GPIO_H	7
-#define GPIO_I	8
+#define BT_MAINTENANCE		1
+#define BT_MAINTENANCE_LONG	2
+// PC8
+#define SIGNAL_IN_0			3
+// PC9
+#define SIGNAL_IN_1			4
+// PA8
+#define SIGNAL_IN_2			5
+// PA10
+#define SIGNAL_IN_3			6
+// PH13
+#define SIGNAL_IN_4			7
+// PH14
+#define SIGNAL_IN_5			8
+// PH15
+#define SIGNAL_IN_6			9
+// PC10
+#define SIGNAL_IN_7			10
+// PD3
+#define SIGNAL_IN_8			11
+// PD6
+#define SIGNAL_IN_9			12
+// PG9
+#define SIGNAL_IN_10		13
+// PG10
+#define SIGNAL_IN_11		14
+// PG11
+#define SIGNAL_IN_12		15
+// PG12
+#define SIGNAL_IN_13		16
+// PG13
+#define SIGNAL_IN_14		17
+// PG14
+#define SIGNAL_IN_15		18
+
+// 24V OK
+// PB6 (1 : CMD_OUT_0 -> CMD_OUT_7)
+#define VOL24_1_OK			19
+// PH4 (2 : CMD_OUT_8 -> CMD_OUT_15)
+#define VOL24_2_OK			20
+// PH5 (3 : CMD_OUT_16 -> CMD_OUT_23)
+#define VOL24_3_OK			21
+
+#define IOINPUTPULLED_MAX	21
+
+// PCA9535  (I2c1 Adr b0100 001x) I2c Interrupt PH10
+#define INPUT_I2C_INT		23
+
+// PH11 DEFAUT 24V
+#define FAULT_24V_INT		24
+// PH12 DEFAUT 12V
+#define FAULT_12V_INT		25
+
+// PCA9535  (I2c1 Adr b0100 001x) I2c Interrupt PH10
+#define EXTEND_INPUT_0		26
+#define EXTEND_INPUT_1		27
+#define EXTEND_INPUT_2		28
+#define EXTEND_INPUT_3		29
+#define EXTEND_INPUT_4		30
+#define EXTEND_INPUT_5		31
+#define EXTEND_INPUT_6		32
+#define EXTEND_INPUT_7		33
+#define EXTEND_INPUT_8		34
+#define EXTEND_INPUT_9		35
+#define EXTEND_INPUT_10		36
+#define EXTEND_INPUT_11		37
+#define EXTEND_INPUT_12		38
+#define EXTEND_INPUT_13		39
+#define EXTEND_INPUT_14		40
+#define EXTEND_INPUT_15		41
+
+#define ANY_POOLED_INPUT	254
+#define ANY_INPUT			255
+
+// -----------------------------
+//         OUTPUT PINS
+// -----------------------------
+
+// PI4 (PWM) ???
+#define CMD_OUT_0				1
+// PI5 (PWM) AF3 TIM8_CH1
+#define CMD_OUT_1				2
+#define PWM_OUT_1				1
+// PI6 (PWM) AF3 TIM8_CH2
+#define CMD_OUT_2				3
+#define PWM_OUT_2				2
+// PI7 (PWM) AF3 TIM8_CH3
+#define CMD_OUT_3				4
+#define PWM_OUT_3				3
+// PE2
+#define CMD_OUT_4				5
+// PE3
+#define CMD_OUT_5				6
+// PE4
+#define CMD_OUT_6				7
+// PE5 (PWM) AF3 TIM9_CH1
+#define CMD_OUT_7				8
+#define PWM_OUT_4				4
+// PE6 (PWM) AF3 TIM9_CH2
+#define CMD_OUT_8				9
+#define PWM_OUT_5				5
+// PI8
+#define CMD_OUT_9				10
+// PC13
+#define CMD_OUT_10			11
+// PI10
+#define CMD_OUT_11			12
+// PI11
+#define CMD_OUT_12			13
+// PF6 (PWM) AF3 TIM10_CH1
+#define CMD_OUT_13			14
+#define PWM_OUT_6				6
+// PF7 (PWM) AF3 TIM11_CH1
+#define CMD_OUT_14			15
+#define PWM_OUT_7				7
+// PF8 (PWM) AF9 TIM13_CH1
+#define CMD_OUT_15			16
+#define PWM_OUT_8				8
+// PF9 (PWM) AF9 TIM14_CH1
+#define CMD_OUT_16			17
+#define PWM_OUT_9				9
+// PF10
+#define CMD_OUT_17			18
+// PC1
+#define CMD_OUT_18			19
+// PC2
+#define CMD_OUT_19			20
+// PC3
+#define CMD_OUT_20			21
+// PA1 (PWM) AF1 TIM2_CH2 | AF2 TIM5_CH2
+#define CMD_OUT_21			22
+#define PWM_OUT_10			10
+// PA2 (PWM) AF1 TIM2_CH3 | AF2 TIM5_CH3 | AF3 TIM9_CH1
+#define CMD_OUT_22			23
+#define PWM_OUT_11			11
+// PH2
+#define CMD_OUT_23			24
+
+// PCA9535  (I2c1 Adr b0100 100x)
+#define EXTEND_COMM_0		26
+#define EXTEND_COMM_1		27
+#define EXTEND_COMM_2		28
+#define EXTEND_COMM_3		29
+#define EXTEND_COMM_4		30
+#define EXTEND_COMM_5		31
+#define EXTEND_COMM_6		32
+#define EXTEND_COMM_7		33
+#define EXTEND_COMM_8		34
+#define EXTEND_COMM_9		35
+#define EXTEND_COMM_10		36
+#define EXTEND_COMM_11		37
+#define EXTEND_COMM_12		38
+#define EXTEND_COMM_13		39
+#define EXTEND_COMM_14		40
+#define EXTEND_COMM_15		41
+
+// -----------------------------
+// IN Divers
+// -----------------------------
+
+// PF11 Commande boutton de maintenance
+// PB0 Roue codeuse (CPES secondaire)
+
+// PB12 PB13 Version
+
+// -----------------------------
+// OUT Divers
+// -----------------------------
+
+// PA5 Status LED RED
+// PA6 Status LED GREEN
+
+// -----------------------------
+//             I2C
+// -----------------------------
+
+// I2c1 PB8 PB9
+// I2c2 PB10 PB11
+
+// Counter Digit PCA9535  (I2c2 Adr b0100 000x) 
+
+// Temperature sensor TMP101 (I2c2 Adr b____ ___x) 
+
+// Gauges LTC2945 (I2c1 Adr b____ 11_x) 24V
+// Gauges LTC2945 (I2c1 Adr b____ 00_x) 12V 
+
+// -----------------------------
+//            UARTS
+// -----------------------------
+
+// UART 1 RS485
+// PH6 RE485 PinOUT
+// PH7 DE485 PinOUT
+
+// UART 6 RS485
+// PH8 DE485 COMPTEUR PinOUT
+// PH9 RE485 COMPTEUR PinOUT
+
+// UART 4 RS232
+// PH3 PILOT_24V PinOUT (pin 7 DB9)
+
+// UART5 PD2 PC12 ??? rien de connecté ????
+
+// -----------------------------
+//             USB
+// -----------------------------
+// PB14 OTG_FS_OC_N
+// PB15 OTG_FS_POW_EN
+// PA9 VBUS
+
+// -----------------------------
+//             SPI
+// -----------------------------
+// PI0 SPI2_NSS
+// PI1 SPI2_SCK
+// PI2 SPI2_MISO
+// PI3 SPI2_MOSI
+// PI9 M_EEPROM/WP (OUTPUT MANUELLE)
+
+#define WAIT_FOREVER	0xFFFFFFFF

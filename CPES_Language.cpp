@@ -3,7 +3,10 @@
 
 #include "stdafx.h"
 #include "CPES_Language.h"
+#include "glob-md5.h"
+#include "md5.h"
 #include <map>
+#include <set>
 #include <list>
 #include <vector>
 #include <string>
@@ -11,6 +14,7 @@ extern "C" {
 #include "CPES_Lang_Func.h"
 #include "CPES_Lang_Exec.h"
 };
+#include <stdio.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -21,6 +25,15 @@ extern "C" {
 CWinApp theApp;
 
 using namespace std;
+
+
+extern "C" {
+
+extern int maxStack;
+
+}
+
+CByteArray	barMD5Digest;
 
 typedef enum _eTokenType {
 	ettUnknow = 0,
@@ -43,6 +56,7 @@ typedef enum _eTokenType {
 	ettNEXT,
 	ettEXIT,
 	ettDEFINE,
+	ettPRAGMA,
 	ettMax
 } eTokenType;
 
@@ -66,7 +80,8 @@ char *arTokenCPES[ettMax] = {
 	"for",
 	"next;",
 	"exit",
-	"#define"
+	"#define",
+	"#pragma",
 };
 
 typedef enum _eTokenSign {
@@ -141,6 +156,7 @@ bool parseTTFOR(char *CPESTextIn, char **CPESTextOut);
 bool parseTTNEXT(char *CPESTextIn, char **CPESTextOut);
 bool parseTTEXIT(char *CPESTextIn, char **CPESTextOut);
 bool parseTTDEFINE(char *CPESTextIn, char **CPESTextOut);
+bool parseTTPRAGMA(char *CPESTextIn, char **CPESTextOut);
 
 fnctTokenParse *arTokenParsers[ettMax] = {
 	NULL,
@@ -162,7 +178,8 @@ fnctTokenParse *arTokenParsers[ettMax] = {
 	parseTTFOR,
 	parseTTNEXT,
 	parseTTEXIT,
-	parseTTDEFINE
+	parseTTDEFINE,
+	parseTTPRAGMA
 };
 
 std::vector<char *> gIdentifier;
@@ -180,13 +197,16 @@ std::vector<int> gIfLabelsPosSTEPVALUE;
 std::vector<std::vector<int>> gIfLabelsPosNEXT;
 
 std::map<std::string, DWORD> gmapDefineValues;
+std::map<std::string, std::string> gmapPragmaValues;
+
+std::set<std::string> gmapPragmaAllowed;
 
 // Functions arrays
 int checkFunctionName(char *tokenString);
 
 bool parseFunctionCall(int iFunctionCall, char *tokenBuff, char *CPESTextIn, char **CPESTextOut);
 
-BYTE stack[4*1024];
+BYTE stack[4*32];
 int posStack;
 BYTE identifierStack[4*1024];
 int posIdentifierStack;
@@ -212,6 +232,10 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 	else
 	{
 		printf("CPES Compiler\n");
+		gmapPragmaAllowed.insert(std::string("outFileName"));
+		gmapPragmaAllowed.insert(std::string("maxStackSize"));
+		gmapPragmaAllowed.insert(std::string("progDescription"));
+
 		if (argc > 1) {
 			std::vector<char *>::iterator it;
 			memset(stack, 0, sizeof(stack));
@@ -250,10 +274,16 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 						char *PCodeOutBinaryFileName = "pcode.out";
 						char *PCodeOutCFileName = "pcode.out.c";
 						char *PCodeOutASMFileName = "pcode.out.a";
+						int iStackSize = sizeof(stack);
 
 						if (argc > 2) {
 							PCodeOutBinaryFileName = new char[strlen(argv[2])+1];
 							strcpy(PCodeOutBinaryFileName, argv[2]);
+						}
+						else if (gmapPragmaValues.find(std::string("outFileName")) !=  gmapPragmaValues.end()) {
+							std::string strVal = gmapPragmaValues.find(std::string("outFileName"))->second;
+							PCodeOutBinaryFileName = new char[strVal.length()+1];
+							strcpy(PCodeOutBinaryFileName, strVal.c_str());
 						}
 						else {
 							PCodeOutBinaryFileName = new char[strlen(PCodeOutBinaryFileName)+1];
@@ -281,22 +311,39 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 						*((DWORD *)&pcode[posPCode]) = 0;
 						posPCode += 4;
 
+						if (gmapPragmaValues.find(std::string("maxStackSize")) !=  gmapPragmaValues.end()) {
+							iStackSize = atoi(gmapPragmaValues.find(std::string("maxStackSize"))->second.c_str());
+						}
+
 						printf("PCODE size : %d\n", posPCode);
 						printf("Identifier Stack size : %d\n", posIdentifierStack);
+						printf("Stack size : %d\n", iStackSize);
 						printf("----------\n");
+						if (gmapPragmaValues.find(std::string("progDescription")) !=  gmapPragmaValues.end()) {
+							std::string strProgDesc = gmapPragmaValues.find(std::string("progDescription"))->second;
+							printf("Prog Description : %s\n", strProgDesc.c_str());
+							printf("----------\n");
+						}
+
+						barMD5Digest.RemoveAll();
+						printf("Writing pcode binary file to compute MD5 : %s\n", "tmp.out");
+						if (WriteCPESPCode("tmp.out", 'b', pcode, posPCode, posIdentifierStack, iStackSize) == true) {
+							printf("success write %s\n", PCodeOutBinaryFileName);
+							md5file("tmp.out", barMD5Digest);		
+						}
 
 						printf("Writing pcode binary file : %s\n", PCodeOutBinaryFileName);
-						if (WriteCPESPCode("pcode.out", 'b', pcode, posPCode, posIdentifierStack, sizeof(stack)) == true) {
+						if (WriteCPESPCode(PCodeOutBinaryFileName, 'b', pcode, posPCode, posIdentifierStack, iStackSize) == true) {
 							printf("success write %s\n", PCodeOutBinaryFileName);
 						}
 
 						printf("Writing pcode c file : %s\n", PCodeOutCFileName);
-						if (WriteCPESPCode(PCodeOutCFileName, 'c', pcode, posPCode, posIdentifierStack, sizeof(stack)) == true) {
+						if (WriteCPESPCode(PCodeOutCFileName, 'c', pcode, posPCode, posIdentifierStack, iStackSize) == true) {
 							printf("success write %s\n", PCodeOutCFileName);
 						}
 
 						printf("Writing pcode ASM file : %s\n", PCodeOutASMFileName);
-						if (WriteCPESPCode(PCodeOutASMFileName, 'a', pcode, posPCode, posIdentifierStack, sizeof(stack)) == true) {
+						if (WriteCPESPCode(PCodeOutASMFileName, 'a', pcode, posPCode, posIdentifierStack, iStackSize) == true) {
 							printf("success write %s\n", PCodeOutASMFileName);
 						}
 
@@ -305,6 +352,10 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 						delete PCodeOutASMFileName;
 
 						pCodeExecute(pcode, posPCode, identifierStack, sizeof(identifierStack), stack, sizeof(stack));
+
+						if (iStackSize < maxStack) {
+							printf("Stack size defined is too small (%d needed %d)\n", iStackSize, maxStack);
+						}
 					}
 				}
 			}
@@ -329,8 +380,11 @@ int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 			gIfLabelsPosSTEPVALUE.clear();
 			gIfLabelsPosNEXT.clear();
 			gmapDefineValues.clear();
+			gmapPragmaValues.clear();
 		}
 	}
+
+	fgetc(stdin);
 
 	return nRetCode;
 }
@@ -387,6 +441,23 @@ bool WriteCPESPCode(char *fileName, char cOutputType, BYTE *pcode, int pcodeSize
 			fwrite(&dwVal, 4, 1, fCPES);
 			dwVal = _CPES_FUNC_VERSION;
 			fwrite(&dwVal, 4, 1, fCPES);
+			if (gmapPragmaValues.find(std::string("progDescription")) !=  gmapPragmaValues.end()) {
+				std::string strProgDesc = gmapPragmaValues.find(std::string("progDescription"))->second;
+				dwVal = strProgDesc.length();
+				fwrite(&dwVal, 4, 1, fCPES);
+				fwrite(strProgDesc.c_str(), dwVal, 1, fCPES);
+			}
+			else {
+				dwVal = 0;
+				fwrite(&dwVal, 4, 1, fCPES);
+			}
+
+			if (barMD5Digest.IsEmpty() == FALSE) {
+				// Ecriture du MD5
+				dwVal = barMD5Digest.GetSize();
+				fwrite(&dwVal, 4, 1, fCPES); // longueur MD5
+				fwrite(barMD5Digest.GetData(), dwVal, 1, fCPES);	// MD5
+			}
 
 			dwVal = pcodeSize;
 			fwrite(&dwVal, 4, 1, fCPES);
@@ -407,6 +478,24 @@ bool WriteCPESPCode(char *fileName, char cOutputType, BYTE *pcode, int pcodeSize
 
 			fprintf(fCPES, "; --------------------------------------\n");
 			fprintf(fCPES, "; PCODE desassembled File\n");
+			fprintf(fCPES, "; --------------------------------------\n");
+			if (gmapPragmaValues.find(std::string("progDescription")) !=  gmapPragmaValues.end()) {
+				std::string strProgDesc = gmapPragmaValues.find(std::string("progDescription"))->second;
+				fprintf(fCPES, "; %s\n", strProgDesc.c_str());
+				fprintf(fCPES, "; --------------------------------------\n");
+			}
+			if (barMD5Digest.IsEmpty() == FALSE) {
+				// Ecriture du MD5
+				int iLoop;
+				fprintf(fCPES, "; MD5 : ");
+				for (iLoop = 0; iLoop < barMD5Digest.GetSize(); iLoop++) {
+					fprintf(fCPES, "%02X", barMD5Digest[iLoop]);
+				}
+				fprintf(fCPES, "\n");
+			}
+			else {
+				fprintf(fCPES, "; NO MD5\n");
+			}
 			fprintf(fCPES, "; --------------------------------------\n");
 			fprintf(fCPES, "; CPES_PCOD_VERSION_GEN %08X\n", _CPES_PCOD_VERSION);
 			fprintf(fCPES, "; CPES_FUNC_VERSION_GEN %08X\n", _CPES_FUNC_VERSION);
@@ -482,6 +571,24 @@ bool WriteCPESPCode(char *fileName, char cOutputType, BYTE *pcode, int pcodeSize
 		else if (cOutputType == 'c') {
 			fprintf(fCPES, "// --------------------------------------\n");
 			fprintf(fCPES, "// PCODE File\n");
+			fprintf(fCPES, "// --------------------------------------\n");
+			if (gmapPragmaValues.find(std::string("progDescription")) !=  gmapPragmaValues.end()) {
+				std::string strProgDesc = gmapPragmaValues.find(std::string("progDescription"))->second;
+				fprintf(fCPES, "// %s\n", strProgDesc.c_str());
+				fprintf(fCPES, "// --------------------------------------\n");
+			}
+			if (barMD5Digest.IsEmpty() == FALSE) {
+				// Ecriture du MD5
+				int iLoop;
+				fprintf(fCPES, "// MD5 : ");
+				for (iLoop = 0; iLoop < barMD5Digest.GetSize(); iLoop++) {
+					fprintf(fCPES, "%02X", barMD5Digest[iLoop]);
+				}
+				fprintf(fCPES, "\n");
+			}
+			else {
+				fprintf(fCPES, "// NO MD5\n");
+			}
 			fprintf(fCPES, "// --------------------------------------\n");
 			fprintf(fCPES, "#include \n");
 			fprintf(fCPES, "#include <math.h>\n");
@@ -606,7 +713,7 @@ bool ParseCPESTexte(char *CPESText)
 									tokenBuff[0] = 0x0; // No return value, void call
 								}
 								else {
-									if (bParse == true && strcmp(tokenBuff, "include") == 0) {
+									if (bParse == true && strcmp(tokenBuff, "#include") == 0) {
 										if (parsePosBeforeInclude == NULL) {
 											FILE *fCPES;
 											bool bIncludeOk = false;
@@ -910,7 +1017,7 @@ bool parseValueNumber(char *CPESTextIn, char **CPESTextOut, DWORD *Number)
 			}
 
 			if (*ptrIndetiferTmp == 0x00) {
-				*Number = strtol(&IndetiferTmp[2], &endPtr, 16);
+				*Number = strtoul(&IndetiferTmp[2], &endPtr, 16);
 				bRet = true;
 			}
 		}
@@ -922,7 +1029,7 @@ bool parseValueNumber(char *CPESTextIn, char **CPESTextOut, DWORD *Number)
 			}
 
 			if (*ptrIndetiferTmp == 0x00) {
-				*Number = strtol(&IndetiferTmp[2], &endPtr, 2);
+				*Number = strtoul(&IndetiferTmp[2], &endPtr, 2);
 				bRet = true;
 			}
 		}
@@ -947,6 +1054,91 @@ bool parseValueNumber(char *CPESTextIn, char **CPESTextOut, DWORD *Number)
 		else {
 			// Something is wrong in identifier name
 		}
+	}
+
+	return bRet;
+}
+
+bool parseValueString(char *CPESTextIn, char **CPESTextOut, std::string &strValue)
+{
+	bool bRet = false;
+	bool bEscapeSequence = false;
+	char byChar;
+	int iEscapeCharCount;
+	char *endPtr;
+	DWORD dwConvVal;
+	
+	strValue.clear();
+	// remove any space
+	while (*CPESTextIn != 0x00 && isspace(*CPESTextIn) != 0) {
+		CPESTextIn++;
+	}
+	
+	if (*CPESTextIn != 0x00 && *CPESTextIn == '"') {
+		CPESTextIn++;
+
+		while (*CPESTextIn != 0x00 && (bEscapeSequence == true || *CPESTextIn != '"')) {
+			byChar = *CPESTextIn++;
+			if (bEscapeSequence == true) {
+				iEscapeCharCount++;
+				if (iEscapeCharCount == 1) {
+					switch (byChar) {
+					case 'a' : byChar =  7; bEscapeSequence = false; break;
+					case 'b' : byChar =  8; bEscapeSequence = false; break;
+					case 'f' : byChar = 12; bEscapeSequence = false; break;
+					case 'n' : byChar = 10; bEscapeSequence = false; break;
+					case 'r' : byChar = 13; bEscapeSequence = false; break;
+					case 't' : byChar =  9; bEscapeSequence = false; break;
+					case 'v' : byChar = 11; bEscapeSequence = false; break;
+					case '\'' : byChar = '\''; bEscapeSequence = false; break;
+					case '"' : byChar = '"'; bEscapeSequence = false; break;
+					case '0' : case '1' : case '2' : case '3' : case '4' : case '5' : case '6' : case '7' : break;
+					case 'x' : break;
+					}
+				}
+				else {
+					switch (*(CPESTextIn - iEscapeCharCount)) {
+					case '0' : case '1' : case '2' : case '3' : case '4' : case '5' : case '6' : case '7' :
+						if (iEscapeCharCount == 4) {
+							dwConvVal = strtoul((CPESTextIn - (iEscapeCharCount-1)), &endPtr, 8);
+							byChar = (dwConvVal & 0x000000FF);
+							bEscapeSequence = false;
+						}
+						break;
+					case 'x' :
+						if (iEscapeCharCount == 3) {
+							dwConvVal = strtoul((CPESTextIn - (iEscapeCharCount-1)), &endPtr, 16);
+							byChar = (dwConvVal & 0x000000FF);
+							bEscapeSequence = false;
+						}
+						break;
+					}
+				}
+				if (bEscapeSequence == false) {
+					strValue += byChar;
+				}
+			}
+			else {
+				if (byChar == '\\') {
+					bEscapeSequence = true;
+					iEscapeCharCount = 0;
+				}
+				else {
+					strValue += byChar;
+				}
+			}
+		}
+
+		if (strValue.empty() == false) {
+			bRet = true;
+		}
+	}
+
+	if (bRet == true) {
+		*CPESTextOut = CPESTextIn;
+	}
+	else {
+		// Something is wrong in string
 	}
 
 	return bRet;
@@ -2222,6 +2414,34 @@ bool parseTTDEFINE(char *CPESTextIn, char **CPESTextOut)
 				gmapDefineValues.find(std::string(Identifier)) == gmapDefineValues.end()) {
 			std::string strKey(Identifier);
 			gmapDefineValues.insert(std::map<std::string, DWORD>::value_type(strKey, Number));
+			bRet = true;
+		}
+	}
+	else {
+		bRet = false;
+	}
+
+	if (Identifier != NULL) {
+		delete Identifier;
+	}
+
+	return bRet;
+}
+
+bool parseTTPRAGMA(char *CPESTextIn, char **CPESTextOut)
+{
+	bool bRet = true;
+
+	char *Identifier = NULL;
+	std::string strVal;
+
+	if (parseIdentifier(CPESTextIn, CPESTextOut, &Identifier) == true) {
+		CPESTextIn = *CPESTextOut;
+		if (parseValueString(CPESTextIn, CPESTextOut, strVal) == true &&
+				gmapPragmaValues.find(std::string(Identifier)) == gmapPragmaValues.end() &&
+				gmapPragmaAllowed.find(std::string(Identifier)) != gmapPragmaAllowed.end()) {
+			std::string strKey(Identifier);
+			gmapPragmaValues.insert(std::map<std::string, std::string>::value_type(strKey, strVal));
 			bRet = true;
 		}
 	}
