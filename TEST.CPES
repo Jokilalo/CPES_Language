@@ -2,108 +2,41 @@
 	Test programm to see how the parser is going on and
 	also how the pcode is generated and running
 */
-include defvars.cpes
+
+#pragma progDescription "Ceci est la description du programme"
+#pragma maxStackSize "16"
+
+#include defvars.cpes
 rem Déclaration des variables
-var TOTO;
-var TETE;
 var X;
 
-TOTO = 0x123456; // Test assignation 
-X = TOTO;
+X = GetTemperature;
+DisplayCounter X;
+WaitInputPin WAIT_FOREVER SIGNAL_IN_0;
 
-TOTO = V1 * V4;
-print TOTO;
-sleep 5000;
+X = GetGaugePower 1;
+DisplayCounter X;
+WaitInputPin WAIT_FOREVER EXTEND_INPUT_0;
 
-for TOTO = 0 to V4 do
-	let TETE = 1 << TOTO;
-	print TETE;
+X = GetGaugePower 2;
+DisplayCounter X;
+WaitInputPin WAIT_FOREVER INPUT_I2C_INT;
+
+for X = CMD_OUT_0 to CMD_OUT_23 do
+	DisplayCounter X;
+	SetOuputPin X 1;
+	sleep 100;
+	SetOuputPin X 0;
 next;
 
-for TOTO = 1 to 10 step 2 do
-	print TOTO;
+DisplayCounter 0;
+WaitInputPin WAIT_FOREVER INPUT_I2C_INT;
+
+
+for X = EXTEND_COMM_0 to EXTEND_COMM_15 do
+	DisplayCounter X;
+	SetOuputPin X 1;
+	sleep 100;
+	SetOuputPin X 0;
 next;
 
-rem assignation simple
-let TOTO = 0b10000;
-print TOTO;
-
-TOTO = 0x10;
-print TOTO;
-
-TOTO = 0 ~ TOTO;
-TOTO = TOTO & 0xFF;
-print TOTO;
-
-TOTO = 2016;
-print TOTO TETE;
-
-TOTO = test 0x78 TETE 90 TETE;
-
-sleep 5000;
-
-print 111111111;
-
-if TOTO < 100 then
-	TOTO = sleep 10000;
-
-	print TOTO;
-
-	exit 22;
-endif;
-
-rem opération sur une variable
-let TETE = 10 + TOTO;
-print TETE;
-
-rem branchage vers un label
-goto Olllla;
-
-rem ce code ne sera jamais exécuté
-let TETE = 10 + TOTO;
-label Zoubinette;
-print TOTO;
-print TETE;
-goto Zoubinette;
-print TETE;
-goto Olllla;
-let TOTO = TOTO + 1;
-
-label Olllla;
-let TOTO = TOTO + 10;
-print TOTO;
-let TOTO = 0;
-
-rem boucle manuelle
-label LoopTOTO;
-	if TOTO > 99 then
-		goto EndProg;
-	else
-		print TOTO;
-	endif;
-	let TOTO = TOTO + 1;
-	goto LoopTOTO;
-label EndProg;
-print TOTO;
-
-let TOTO = 0;
-let TETE = 0;
-rem boucle "tant que"
-sleep 1000;
-while TOTO != V4 do
-	let TOTO = TOTO + 1;
-	if TOTO > 4 then break; endif;
-	if TOTO < 2 then continue; endif;
-	let TETE = TETE + 1;
-done;
-print TOTO;
-print TETE;
-sleep 5000;
-
-for TOTO = 0 to 16 do
-	if TOTO < 3 then continue; endif;
-	if TOTO > 7 then break; endif;
-	let TETE = 1 << TOTO;
-	print TETE;
-next;
-sleep 5000;
